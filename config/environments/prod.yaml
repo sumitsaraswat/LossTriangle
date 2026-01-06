@@ -1,0 +1,52 @@
+# Production Environment Configuration
+environment: prod
+
+# Unity Catalog settings
+catalog:
+  name: unified_reserves
+  schemas:
+    bronze: bronze
+    silver: silver
+    gold: gold
+
+# Databricks workspace
+workspace:
+  host: ${DATABRICKS_HOST}
+  cluster_id: ${DATABRICKS_CLUSTER_ID}
+
+# Storage locations (Volumes: /Volumes/<catalog>/<schema>/<volume>)
+storage:
+  root: /Volumes/unified_reserves/bronze/raw
+  bronze: /Volumes/unified_reserves/bronze/raw
+  silver: /Volumes/unified_reserves/silver/processed
+  gold: /Volumes/unified_reserves/gold/curated
+  checkpoints: /Volumes/unified_reserves/bronze/checkpoints
+
+# Data settings
+data:
+  use_synthetic: false
+  source_system: "claims_warehouse"
+
+# Model settings
+model:
+  chain_ladder:
+    n_periods: 10
+    tail_factor: 1.02  # Slightly higher for conservatism
+  nlp:
+    use_ml_model: true
+    model_path: /Volumes/unified_reserves/gold/models/risk_classifier
+    risk_threshold: 0.5
+
+# Logging
+logging:
+  level: INFO
+  format: "{time} | {level} | {message}"
+
+# Alerting
+alerts:
+  reserve_adequacy_threshold: 0.85
+  high_risk_exposure_threshold: 1000000
+  notification_emails:
+    - actuarial-team@company.com
+    - cfo@company.com
+

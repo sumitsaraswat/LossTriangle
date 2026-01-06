@@ -1,0 +1,291 @@
+# Databricks Asset Bundle Configuration
+# Project: The Long-Tail Storm
+# Automated Loss Triangle Reserving & AI-Driven Solvency
+
+bundle:
+  name: LossTriangle
+
+# Include additional configuration files
+include:
+  - ./workflows/*.yml
+
+# Variables for parameterization
+variables:
+  catalog:
+    description: Unity Catalog name
+    default: unified_reserves
+  warehouse_id:
+    description: SQL Warehouse ID for queries
+    default: ""
+
+# Workspace settings
+workspace:
+  host: https://adb-984752964297111.11.azuredatabricks.net
+  profile: DEFAULT  # Specify which CLI profile to use
+
+# Artifact locations (uncomment when ready to build wheel)
+# artifacts:
+#   loss_triangle_wheel:
+#     type: whl
+#     path: ./dist
+#     build: python setup.py bdist_wheel
+
+# Resource definitions
+resources:
+  # Databricks App
+  apps:
+    ultimate_reserve_projection:
+      name: ultimate-reserve-projection
+      description: "Actuarial Reserving Platform for loss triangle analysis and reserve estimation"
+      source_code_path: ./app
+      permissions:
+        - user_name: shirly.wang@databricks.com
+          level: CAN_MANAGE
+        - user_name: sumit.saraswat@databricks.com
+          level: CAN_MANAGE
+
+  # Jobs for the pipeline
+  jobs:
+    # Daily data ingestion job
+    bronze_ingestion:
+      name: "[${bundle.target}] Bronze - Data Ingestion"
+      description: "Ingest raw claims and payment data into Bronze layer"
+      schedule:
+        quartz_cron_expression: "0 0 6 * * ?"
+        timezone_id: America/New_York
+      tasks:
+        - task_key: ingest_claims
+          notebook_task:
+            notebook_path: ./notebooks/01_bronze/01_data_ingestion.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: shared_cluster
+      job_clusters:
+        - job_cluster_key: shared_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+      tags:
+        layer: bronze
+        project: loss-triangle
+
+    # Silver layer transformation job
+    silver_transformation:
+      name: "[${bundle.target}] Silver - Triangle & Risk Analysis"
+      description: "Build loss triangles and run NLP risk detection"
+      schedule:
+        quartz_cron_expression: "0 0 7 * * ?"
+        timezone_id: America/New_York
+      tasks:
+        - task_key: build_triangles
+          notebook_task:
+            notebook_path: ./notebooks/02_silver/02_triangle_builder.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: ml_cluster
+        
+        - task_key: risk_detection
+          depends_on:
+            - task_key: build_triangles
+          notebook_task:
+            notebook_path: ./notebooks/02_silver/03_risk_detection.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: ml_cluster
+      
+      job_clusters:
+        - job_cluster_key: ml_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS4_v2
+            num_workers: 2
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+      tags:
+        layer: silver
+        project: loss-triangle
+
+    # Gold layer reserving job
+    gold_reserving:
+      name: "[${bundle.target}] Gold - Chain Ladder Reserving"
+      description: "Calculate IBNR reserves using Chain Ladder method"
+      schedule:
+        quartz_cron_expression: "0 0 8 * * ?"
+        timezone_id: America/New_York
+      tasks:
+        - task_key: calculate_reserves
+          notebook_task:
+            notebook_path: ./notebooks/03_gold/04_chain_ladder.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: compute_cluster
+        
+        - task_key: setup_genie
+          depends_on:
+            - task_key: calculate_reserves
+          notebook_task:
+            notebook_path: ./notebooks/04_analytics/05_genie_setup.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: compute_cluster
+      
+      job_clusters:
+        - job_cluster_key: compute_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+      tags:
+        layer: gold
+        project: loss-triangle
+
+    # Full pipeline orchestration
+    full_pipeline:
+      name: "[${bundle.target}] Full Pipeline - Loss Triangle"
+      description: "End-to-end pipeline: Bronze → Silver → Gold"
+      tasks:
+        - task_key: setup
+          notebook_task:
+            notebook_path: ./notebooks/00_setup/00_environment_setup.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: setup_cluster
+        
+        - task_key: bronze_ingest
+          depends_on:
+            - task_key: setup
+          notebook_task:
+            notebook_path: ./notebooks/01_bronze/01_data_ingestion.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: setup_cluster
+        
+        - task_key: silver_triangles
+          depends_on:
+            - task_key: bronze_ingest
+          notebook_task:
+            notebook_path: ./notebooks/02_silver/02_triangle_builder.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: ml_cluster
+        
+        - task_key: silver_risk
+          depends_on:
+            - task_key: silver_triangles
+          notebook_task:
+            notebook_path: ./notebooks/02_silver/03_risk_detection.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: ml_cluster
+        
+        - task_key: gold_reserves
+          depends_on:
+            - task_key: silver_risk
+          notebook_task:
+            notebook_path: ./notebooks/03_gold/04_chain_ladder.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: compute_cluster
+        
+        - task_key: analytics_genie
+          depends_on:
+            - task_key: gold_reserves
+          notebook_task:
+            notebook_path: ./notebooks/04_analytics/05_genie_setup.py
+            base_parameters:
+              catalog: ${var.catalog}
+          job_cluster_key: compute_cluster
+      
+      job_clusters:
+        - job_cluster_key: setup_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+        
+        - job_cluster_key: ml_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS4_v2
+            num_workers: 2
+            spark_conf:
+              spark.databricks.delta.preview.enabled: "true"
+        
+        - job_cluster_key: compute_cluster
+          new_cluster:
+            spark_version: 15.4.x-scala2.12
+            node_type_id: Standard_DS3_v2
+            num_workers: 1
+      
+      tags:
+        pipeline: full
+        project: loss-triangle
+
+# Environment targets
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: unified_reserves
+    workspace:
+      host: https://adb-984752964297111.11.azuredatabricks.net
+      profile: DEFAULT
+    resources:
+      jobs:
+        bronze_ingestion:
+          schedule: null  # Disable schedule in dev
+        silver_transformation:
+          schedule: null
+        gold_reserving:
+          schedule: null
+
+  staging:
+    mode: development
+    variables:
+      catalog: unified_reserves
+    workspace:
+      host: https://adb-984752964297111.11.azuredatabricks.net
+      profile: DEFAULT
+    resources:
+      jobs:
+        bronze_ingestion:
+          schedule:
+            quartz_cron_expression: "0 0 6 * * ?"
+            timezone_id: America/New_York
+
+  prod:
+    mode: production
+    variables:
+      catalog: unified_reserves
+    workspace:
+      host: https://adb-984752964297111.11.azuredatabricks.net
+      profile: DEFAULT
+      root_path: /Shared/.bundle/prod/${bundle.name}
+    run_as:
+      # Specify a service principal for production
+      # service_principal_name: loss-triangle-sp
+      user_name: ${workspace.current_user.userName}
+    resources:
+      jobs:
+        bronze_ingestion:
+          permissions:
+            - level: CAN_VIEW
+              group_name: data-analysts
+            - level: CAN_MANAGE_RUN
+              group_name: data-engineers
+        silver_transformation:
+          permissions:
+            - level: CAN_VIEW
+              group_name: data-analysts
+            - level: CAN_MANAGE_RUN
+              group_name: data-engineers
+        gold_reserving:
+          permissions:
+            - level: CAN_VIEW
+              group_name: actuarial-team
+            - level: CAN_MANAGE_RUN
+              group_name: data-engineers

@@ -1,0 +1,36 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="#f8f9fa" stroke="#1e3a5f" stroke-width="3"/>
+  
+  <!-- Shield background -->
+  <path d="M100 25 L165 50 L165 100 Q165 150 100 180 Q35 150 35 100 L35 50 Z" 
+        fill="#2d5a87" stroke="#1e3a5f" stroke-width="2"/>
+  
+  <!-- Inner shield gradient effect -->
+  <path d="M100 40 L150 60 L150 100 Q150 140 100 165 Q50 140 50 100 L50 60 Z" 
+        fill="#3d7ab5"/>
+  
+  <!-- Triangle/Chart symbol representing loss triangles -->
+  <polygon points="100,55 140,120 60,120" fill="white" opacity="0.95"/>
+  <polygon points="100,70 125,105 75,105" fill="#2d5a87"/>
+  
+  <!-- Checkmark representing claim verification -->
+  <path d="M80 95 L95 110 L125 75" 
+        stroke="white" stroke-width="6" 
+        fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Small decorative elements -->
+  <circle cx="100" cy="140" r="3" fill="white" opacity="0.8"/>
+  <circle cx="90" cy="145" r="2" fill="white" opacity="0.6"/>
+  <circle cx="110" cy="145" r="2" fill="white" opacity="0.6"/>
+  
+  <!-- Company name arc at bottom -->
+  <defs>
+    <path id="textArc" d="M 30 150 Q 100 190 170 150" fill="none"/>
+  </defs>
+  <text fill="#1e3a5f" font-family="Arial, sans-serif" font-size="14" font-weight="bold">
+    <textPath href="#textArc" startOffset="50%" text-anchor="middle">
+      CLAIMWISE INSURANCE
+    </textPath>
+  </text>
+</svg>

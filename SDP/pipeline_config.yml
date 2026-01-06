@@ -1,0 +1,123 @@
+# Delta Live Tables Pipeline Configuration
+# Project: Loss Triangle - Spark Declarative Pipeline (SDP)
+# 
+# This file defines the DLT pipeline configuration for deployment
+
+# =============================================================================
+# PIPELINE CONFIGURATION
+# =============================================================================
+
+# Pipeline settings
+pipeline:
+  name: "LossTriangle_SDP_Pipeline"
+  target: "unified_reserves"  # Target catalog/schema
+  
+  # Development mode settings
+  development: true
+  continuous: false
+  
+  # Cluster configuration
+  cluster:
+    label: "default"
+    spark_version: "15.4.x-scala2.12"
+    node_type_id: "Standard_DS3_v2"
+    num_workers: 1
+    
+  # Pipeline libraries
+  # NOTE: Use ONLY batch embedded file (01_bronze_batch_embedded) for demo
+  #       The streaming file (01_bronze_streaming_external) requires uploaded data
+  libraries:
+    # Bronze Layer - CHOOSE ONE:
+    # Option A: Embedded sample data (recommended for demo)
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/bronze/01_bronze_batch_embedded"
+    # Option B: Streaming from external files (requires data in Volumes)
+    # - notebook:
+    #     path: "/Workspace/Repos/LossTriangle/SDP/bronze/01_bronze_streaming_external"
+    
+    # Silver Layer
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/silver/01_silver_enriched_claims"
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/silver/02_silver_loss_triangles"
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/silver/03_silver_nlp_risk"
+    
+    # Gold Layer
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/gold/01_gold_development_factors"
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/gold/02_gold_chain_ladder"
+    - notebook:
+        path: "/Workspace/Repos/LossTriangle/SDP/gold/03_gold_views"
+
+  # Data quality settings
+  data_quality:
+    expectation_action: "DROP"  # DROP, FAIL, or ALLOW
+    
+  # Photon acceleration
+  photon: true
+
+# =============================================================================
+# TABLE DEPENDENCIES (DAG)
+# =============================================================================
+# 
+# Bronze Layer:
+#   bronze_raw_claims_batch      <- Sample data embedded in SQL
+#   bronze_raw_payments_batch    <- Sample data embedded in SQL
+#
+# Silver Layer:
+#   silver_claims_with_payments      <- bronze_raw_claims_batch, bronze_raw_payments_batch
+#   silver_claims_basic_risk         <- silver_claims_with_payments
+#   silver_triangle_base             <- bronze_raw_claims_batch, bronze_raw_payments_batch
+#   silver_triangle_cells            <- silver_triangle_base
+#   silver_triangle_by_loss_type     <- silver_triangle_base
+#   silver_triangle_pivot            <- silver_triangle_cells
+#   silver_enriched_claims_nlp       <- silver_claims_with_payments (Python NLP)
+#   silver_risk_summary              <- silver_claims_basic_risk
+#   silver_risk_summary_nlp          <- silver_enriched_claims_nlp
+#
+# Gold Layer:
+#   gold_ata_factor_base             <- silver_triangle_cells
+#   gold_ata_factors                 <- gold_ata_factor_base
+#   gold_cdf_factors                 <- gold_ata_factors
+#   gold_reserve_estimates           <- silver_triangle_pivot (Python Chain Ladder)
+#   gold_reserve_summary             <- gold_reserve_estimates, silver_risk_summary_nlp
+#   gold_development_factors_python  <- silver_triangle_pivot
+#   gold_v_reserve_adequacy          <- gold_reserve_summary
+#   gold_v_ibnr_by_origin            <- gold_reserve_estimates
+#   gold_v_risk_exposure             <- silver_risk_summary_nlp
+#   gold_v_executive_dashboard       <- gold_reserve_summary
+#   gold_v_development_factors       <- gold_development_factors_python
+#   gold_v_claims_watchlist          <- silver_enriched_claims_nlp
+
+# =============================================================================
+# DEPLOYMENT INSTRUCTIONS
+# =============================================================================
+#
+# Option 1: Databricks UI (Recommended for Demo)
+# 1. Go to Workflows > Delta Live Tables
+# 2. Click "Create Pipeline"
+# 3. Name: "LossTriangle_SDP_Pipeline"
+# 4. Add Source Code from Git or upload notebooks
+# 5. Target: "unified_reserves" (catalog)
+# 6. Storage Location: (leave blank for managed)
+# 7. Click "Create" then "Start"
+#
+# IMPORTANT: Only add 01_bronze_batch_embedded.sql (NOT streaming)
+# The batch file has embedded sample data - no external files needed!
+#
+# Option 2: Databricks CLI
+# databricks pipelines create --json '{
+#   "name": "LossTriangle_SDP_Pipeline",
+#   "target": "unified_reserves",
+#   "libraries": [
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/bronze/01_bronze_batch_embedded"}},
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/silver/01_silver_enriched_claims"}},
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/silver/02_silver_loss_triangles"}},
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/silver/03_silver_nlp_risk"}},
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/gold/01_gold_development_factors"}},
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/gold/02_gold_chain_ladder"}},
+#     {"notebook": {"path": "/Workspace/Repos/LossTriangle/SDP/gold/03_gold_views"}}
+#   ]
+# }'

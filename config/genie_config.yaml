@@ -1,0 +1,132 @@
+# AI/BI Genie Configuration
+# Owner: David (Analytics Lead)
+# 
+# This configuration defines how Genie understands
+# the insurance reserving domain and answers questions.
+
+genie_space:
+  name: "Insurance Reserving Assistant"
+  description: |
+    AI-powered assistant for insurance loss reserving analysis.
+    Ask questions about reserves, IBNR, loss development, and risk exposure.
+
+# Tables Genie can access
+tables:
+  - catalog: unified_reserves
+    schema: gold
+    tables:
+      - reserve_estimates
+      - reserve_summary
+      - development_factors
+      - v_reserve_adequacy
+      - v_ibnr_by_origin
+      - v_risk_exposure
+      - v_executive_dashboard
+
+  - catalog: unified_reserves
+    schema: silver
+    tables:
+      - enriched_claims
+      - risk_summary
+      - loss_triangles
+
+# Metric definitions for Genie
+metrics:
+  reserve_adequacy:
+    display_name: "Reserve Adequacy"
+    description: "Ratio of held reserves to estimated ultimate loss"
+    sql: "held_reserves / NULLIF(total_ultimate, 0)"
+    format: "percentage"
+    thresholds:
+      good: 1.0
+      warning: 0.85
+      critical: 0.7
+
+  ibnr:
+    display_name: "IBNR"
+    description: "Incurred But Not Reported reserves"
+    sql: "total_ibnr"
+    format: "currency"
+
+  loss_ratio:
+    display_name: "Loss Ratio"
+    description: "Incurred losses divided by earned premium"
+    sql: "incurred_loss / NULLIF(earned_premium, 0)"
+    format: "percentage"
+
+  high_risk_exposure:
+    display_name: "High Risk Exposure"
+    description: "Total exposure from AI-flagged high-risk claims"
+    sql: "high_risk_incurred"
+    format: "currency"
+
+# Sample questions for training/testing
+sample_questions:
+  - question: "What is our total IBNR?"
+    expected_table: gold.reserve_summary
+    expected_columns: [total_ibnr]
+
+  - question: "Show me reserve adequacy by loss type"
+    expected_table: gold.v_reserve_adequacy
+    expected_columns: [loss_type, reserve_adequacy, adequacy_status]
+
+  - question: "What is our exposure for Water Damage claims in 2018?"
+    expected_table: gold.reserve_estimates
+    expected_filter: "loss_type = 'Water Damage' AND origin_period = 2018"
+
+  - question: "Which loss types have deficient reserves?"
+    expected_table: gold.v_reserve_adequacy
+    expected_filter: "adequacy_status = 'DEFICIENT'"
+
+  - question: "Show me high risk claims for Miami-Dade county"
+    expected_table: silver.enriched_claims
+    expected_filter: "county = 'Miami-Dade' AND high_risk_flag = TRUE"
+
+  - question: "What percentage of Water Damage claims are high risk?"
+    expected_table: silver.risk_summary
+    expected_filter: "loss_type = 'Water Damage'"
+    expected_columns: [high_risk_pct]
+
+# Domain-specific terminology
+terminology:
+  - term: "storm"
+    synonyms: ["hurricane", "catastrophe", "CAT"]
+    context: "Refers to catastrophe events like hurricanes"
+
+  - term: "2018 storm"
+    interpretation: "Origin year 2018, likely catastrophe_code filter"
+
+  - term: "mold claims"
+    interpretation: "Claims with risk_category = 'water_damage' or keywords containing 'mold'"
+
+  - term: "lawyer claims"
+    interpretation: "Claims with risk_category = 'litigation'"
+
+  - term: "old claims"
+    interpretation: "Claims older than 24 months from origin"
+
+  - term: "enough cash"
+    interpretation: "Compare held_reserves to total_ultimate (reserve_adequacy >= 1.0)"
+
+# Instructions for Genie
+instructions: |
+  You are an insurance reserving expert assistant. Help users understand:
+  
+  1. **Reserve Adequacy**: Whether the company has enough reserves for future claims
+     - Adequate: >= 100% of estimated ultimate
+     - Marginal: 85-100%
+     - Deficient: < 85%
+  
+  2. **IBNR**: Claims that occurred but aren't fully reported/paid yet
+  
+  3. **Risk Flags**: AI has analyzed claim notes for hidden risks like:
+     - Water damage/mold (long-tail development)
+     - Litigation involvement (expensive claims)
+     - Structural issues
+  
+  4. **Loss Triangles**: Show historical claim development patterns
+  
+  When users ask about specific events like "the 2018 storm", filter by origin_year = 2018.
+  When they ask about "enough cash" or "solvency", check reserve_adequacy metric.
+  When they mention "mold" or "lawyers", check the risk_category field.
+

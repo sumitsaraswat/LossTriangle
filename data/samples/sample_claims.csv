@@ -1,0 +1,19 @@
+claim_id,policy_id,loss_date,report_date,claimant_name,loss_type,loss_description,adjuster_notes,claim_status,county,state,zip_code,catastrophe_code,created_at,updated_at
+CLM-2018-001,POL-12345,2018-09-15,2018-09-16,John Smith,Water Damage,Hurricane caused roof damage and flooding,Initial inspection complete. Roof damage confirmed. Water intrusion in multiple rooms.,Open,Miami-Dade,FL,33101,CAT-2018-MICHAEL,2018-09-16 10:30:00,2024-01-15 14:20:00
+CLM-2018-002,POL-12346,2018-09-15,2018-09-18,Maria Garcia,Wind,Severe wind damage to exterior,Wind damage to siding and windows. Multiple areas affected.,Closed,Miami-Dade,FL,33102,CAT-2018-MICHAEL,2018-09-18 09:15:00,2019-03-20 11:30:00
+CLM-2018-003,POL-12347,2018-09-15,2018-10-01,Robert Johnson,Water Damage,Flooding from storm surge,Significant water damage. Signs of mold developing. Recommend immediate remediation. Customer mentioned consulting attorney.,Open,Broward,FL,33301,CAT-2018-MICHAEL,2018-10-01 14:45:00,2024-06-10 09:00:00
+CLM-2018-004,POL-12348,2018-09-16,2018-09-20,Sarah Williams,Water Damage,Roof leak causing interior damage,Water seepage through damaged roof. Drywall damage in living room and bedroom. Early signs of moisture accumulation.,Closed,Palm Beach,FL,33401,CAT-2018-MICHAEL,2018-09-20 11:00:00,2020-02-15 16:30:00
+CLM-2018-005,POL-12349,2018-09-15,2018-11-15,Michael Brown,Water Damage,Delayed water damage discovery,Customer discovered black mold in walls two months after storm. Extensive remediation required. Attorney representation confirmed.,Open,Miami-Dade,FL,33103,CAT-2018-MICHAEL,2018-11-15 13:30:00,2024-09-01 10:15:00
+CLM-2019-001,POL-22345,2019-06-10,2019-06-12,Jennifer Davis,Fire,Kitchen fire damage,Fire started in kitchen. Smoke and fire damage to multiple rooms. No injuries reported.,Closed,Orange,FL,32801,,2019-06-12 08:00:00,2019-12-01 15:00:00
+CLM-2019-002,POL-22346,2019-08-20,2019-08-22,David Wilson,Theft,Burglary with property loss,Break-in through back door. Electronics and jewelry stolen. Police report filed.,Closed,Hillsborough,FL,33601,,2019-08-22 10:30:00,2019-11-15 14:00:00
+CLM-2020-001,POL-32345,2020-03-15,2020-03-18,Lisa Anderson,Water Damage,Pipe burst during cold snap,Frozen pipe burst causing flooding. Significant water damage to flooring and walls. Damp conditions noted.,Open,Duval,FL,32099,,2020-03-18 09:00:00,2024-03-10 11:30:00
+CLM-2020-002,POL-32346,2020-06-01,2020-06-05,James Taylor,Liability,Slip and fall on property,Visitor injured on property. Medical expenses claimed. Lawsuit filed by injured party. Legal counsel engaged.,Open,Miami-Dade,FL,33104,,2020-06-05 14:00:00,2024-08-20 16:45:00
+CLM-2021-001,POL-42345,2021-09-01,2021-09-03,Amanda Martinez,Wind,Hurricane Ida damage,Roof and siding damage from Hurricane Ida. Tree fell on garage. Structural assessment needed.,Open,Miami-Dade,FL,33105,CAT-2021-IDA,2021-09-03 11:00:00,2024-05-15 13:00:00
+
+
+
+
+
+
+
+

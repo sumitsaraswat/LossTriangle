@@ -1,0 +1,17 @@
+<svg width="32" height="32" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Shield background -->
+  <path d="M50 5 L90 20 L90 50 Q90 80 50 95 Q10 80 10 50 L10 20 Z" 
+        fill="#2d5a87" stroke="#1e3a5f" stroke-width="2"/>
+  
+  <!-- Inner shield -->
+  <path d="M50 15 L80 27 L80 50 Q80 73 50 85 Q20 73 20 50 L20 27 Z" 
+        fill="#3d7ab5"/>
+  
+  <!-- Triangle/Chart symbol -->
+  <polygon points="50,30 70,65 30,65" fill="white" opacity="0.9"/>
+  <polygon points="50,38 62,58 38,58" fill="#2d5a87"/>
+  
+  <!-- Checkmark -->
+  <path d="M40 52 L48 60 L65 40" stroke="white" stroke-width="4" 
+        fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

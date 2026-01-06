@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Claims Schema",
+  "description": "Schema for insurance claims data",
+  "type": "object",
+  "required": ["claim_id", "policy_id", "loss_date", "report_date", "loss_type", "claim_status"],
+  "properties": {
+    "claim_id": {
+      "type": "string",
+      "description": "Unique identifier for the claim"
+    },
+    "policy_id": {
+      "type": "string",
+      "description": "Policy identifier"
+    },
+    "loss_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the loss occurred"
+    },
+    "report_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date when the claim was reported"
+    },
+    "claimant_name": {
+      "type": "string",
+      "description": "Name of the claimant"
+    },
+    "loss_type": {
+      "type": "string",
+      "enum": ["Water Damage", "Wind", "Fire", "Theft", "Liability", "Other"],
+      "description": "Type of loss"
+    },
+    "loss_description": {
+      "type": "string",
+      "description": "Detailed description of the loss"
+    },
+    "adjuster_notes": {
+      "type": "string",
+      "description": "Notes from the claims adjuster"
+    },
+    "claim_status": {
+      "type": "string",
+      "enum": ["Open", "Closed", "Reopened", "Pending"],
+      "description": "Current status of the claim"
+    },
+    "county": {
+      "type": "string",
+      "description": "County where the loss occurred"
+    },
+    "state": {
+      "type": "string",
+      "description": "State where the loss occurred"
+    },
+    "zip_code": {
+      "type": "string",
+      "description": "ZIP code of the loss location"
+    },
+    "catastrophe_code": {
+      "type": "string",
+      "description": "Catastrophe event code if applicable"
+    }
+  }
+}
+
+
+
+
+
+
+
+

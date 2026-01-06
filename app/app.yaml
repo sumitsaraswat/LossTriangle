@@ -1,0 +1,39 @@
+# Ultimate Reserve Projection - Databricks App Configuration
+
+# App metadata
+name: ultimate-reserve-projection
+description: |
+  Ultimate Reserve Projection - Actuarial Reserving Platform
+  
+  A comprehensive actuarial analytics application for:
+  - Loss triangle analysis and visualization
+  - Chain Ladder and Bornhuetter-Ferguson reserve estimation
+  - Interactive method weighting and blending
+  - AI-powered risk detection and reserve adjustments
+  - Submission workflow with audit trail
+
+# Command to run the app
+command:
+  - streamlit
+  - run
+  - app.py
+  - --server.port
+  - "8000"
+  - --server.address
+  - "0.0.0.0"
+
+# Environment variables
+# IMPORTANT: Must match DLT pipeline target (unified_reserves.losstriangle)
+env:
+  - name: CATALOG
+    value: unified_reserves
+  - name: SCHEMA
+    value: losstriangle
+  # SQL Warehouse connection - update these with your values from Databricks
+  # Get these from: Databricks Workspace > SQL Warehouses > Connection Details
+  - name: DATABRICKS_SERVER_HOSTNAME
+    value: "<your-workspace>.azuredatabricks.net"  # Replace with your hostname
+  - name: DATABRICKS_HTTP_PATH
+    value: "/sql/1.0/warehouses/<your-warehouse-id>"  # Replace with your warehouse path
+  - name: DATABRICKS_TOKEN
+    value: ""  # Set via Databricks App secrets, NOT here (security risk)
