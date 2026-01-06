@@ -371,7 +371,7 @@ def render_reserve_projection():
     
     col1, col2 = st.columns([1, 1])
     with col1:
-        selected_loss_type = st.selectbox("Loss Type", ['ALL'] + loss_types, key="loss_type_select")
+        selected_loss_type = st.selectbox("Loss Type", loss_types, key="loss_type_select")
     with col2:
         st.markdown(f"**Selected:** {selected_loss_type}")
     
