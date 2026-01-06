@@ -10,6 +10,15 @@ import numpy as np
 from datetime import datetime
 import base64
 import os
+import logging
+from databricks.sdk.core import Config
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__) 
 
 # SQL Connector for Databricks
 try:
@@ -28,43 +37,61 @@ DATABRICKS_TOKEN = os.getenv("DATABRICKS_TOKEN", "")
 
 def get_sql_connection():
     """Create a connection to Databricks SQL Warehouse"""
+    logger.info("Attempting to establish SQL connection...")
+    logger.info(f"SQL_CONNECTOR_AVAILABLE: {SQL_CONNECTOR_AVAILABLE}")
+    logger.info(f"DATABRICKS_HOST: {DATABRICKS_HOST[:20] + '...' if DATABRICKS_HOST and len(DATABRICKS_HOST) > 20 else DATABRICKS_HOST}")
+    logger.info(f"DATABRICKS_HTTP_PATH: {DATABRICKS_HTTP_PATH[:30] + '...' if DATABRICKS_HTTP_PATH and len(DATABRICKS_HTTP_PATH) > 30 else DATABRICKS_HTTP_PATH}")
+    
+    cfg = Config()
     if not SQL_CONNECTOR_AVAILABLE:
+        logger.warning("SQL Connector not available - databricks-sql package not installed")
         return None
-    if not DATABRICKS_HOST or not DATABRICKS_HTTP_PATH or not DATABRICKS_TOKEN:
-        return None
+    # if not DATABRICKS_HOST or not DATABRICKS_HTTP_PATH or not DATABRICKS_TOKEN:
+    #     return None
     try:
-        return databricks_sql.connect(
+        logger.info("Calling databricks_sql.connect()...")
+        conn = databricks_sql.connect(
             server_hostname=DATABRICKS_HOST,
             http_path=DATABRICKS_HTTP_PATH,
-            access_token=DATABRICKS_TOKEN,
+            credentials_provider=lambda: cfg.authenticate,
             _socket_timeout=30  # 30 second timeout
         )
+        logger.info("✅ SQL connection established successfully!")
+        return conn
     except Exception as e:
+        logger.error(f"❌ Failed to establish SQL connection: {str(e)}", exc_info=True)
         return None
 
 def run_sql_query(query, silent=True):
     """Execute a SQL query and return results as DataFrame"""
+    logger.info(f"Executing SQL query: {query[:100]}..." if len(query) > 100 else f"Executing SQL query: {query}")
     conn = get_sql_connection()
     if conn is None:
+        logger.warning("Cannot execute query - connection is None")
         return None
     try:
+        logger.info("Creating cursor and executing query...")
         with conn.cursor() as cursor:
             cursor.execute(query)
             if cursor.description:
                 columns = [desc[0] for desc in cursor.description]
                 data = cursor.fetchall()
+                logger.info(f"✅ Query executed successfully. Returned {len(data)} rows with columns: {columns}")
                 return pd.DataFrame(data, columns=columns)
+            logger.info("Query executed but returned no data (no cursor description)")
             return None
-    except Exception:
+    except Exception as e:
+        logger.error(f"❌ Query execution failed: {str(e)}", exc_info=True)
         return None
     finally:
         try:
             conn.close()
-        except:
-            pass
+            logger.info("Connection closed")
+        except Exception as e:
+            logger.warning(f"Error closing connection: {str(e)}")
 
 # Check if we can connect to real data
-USE_REAL_DATA = SQL_CONNECTOR_AVAILABLE and DATABRICKS_HOST and DATABRICKS_HTTP_PATH and DATABRICKS_TOKEN
+USE_REAL_DATA = SQL_CONNECTOR_AVAILABLE and DATABRICKS_HOST and DATABRICKS_HTTP_PATH #and DATABRICKS_TOKEN
 
 st.set_page_config(page_title="Ultimate Reserve Projection", page_icon="📊", layout="wide", initial_sidebar_state="expanded")
 
@@ -320,6 +347,26 @@ def main():
         if st.button("🔄 Refresh Data", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
+        
+        # Add connection test button
+        st.markdown("---")
+        if st.button("🔌 Test SQL Connection", use_container_width=True):
+            logger.info("=== Connection Test Initiated ===")
+            conn = get_sql_connection()
+            if conn:
+                st.success("✅ Connection successful! Check console logs for details.")
+                try:
+                    # Try a simple query
+                    test_query = "SELECT 1 as test"
+                    df = run_sql_query(test_query, silent=False)
+                    if df is not None:
+                        st.success(f"✅ Test query executed successfully!")
+                    conn.close()
+                except Exception as e:
+                    st.error(f"❌ Test query failed: {str(e)}")
+            else:
+                st.error("❌ Connection failed! Check console logs for details.")
+            logger.info("=== Connection Test Completed ===")
 
     # Navigation at top of main area
     nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 2])
@@ -358,8 +405,8 @@ def render_reserve_projection():
             missing.append("DATABRICKS_SERVER_HOSTNAME not set")
         if not DATABRICKS_HTTP_PATH:
             missing.append("DATABRICKS_HTTP_PATH not set")
-        if not DATABRICKS_TOKEN:
-            missing.append("DATABRICKS_TOKEN not set")
+        # if not DATABRICKS_TOKEN:
+        #     missing.append("DATABRICKS_TOKEN not set")
         debug_msg = ", ".join(missing) if missing else "Connection test failed"
         st.markdown(f'<div class="data-source">⚠️ Using sample data ({debug_msg})</div>', unsafe_allow_html=True)
     

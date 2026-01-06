@@ -32,8 +32,8 @@ env:
   # SQL Warehouse connection - update these with your values from Databricks
   # Get these from: Databricks Workspace > SQL Warehouses > Connection Details
   - name: DATABRICKS_SERVER_HOSTNAME
-    value: "<your-workspace>.azuredatabricks.net"  # Replace with your hostname
+    value: "adb-984752964297111.11.azuredatabricks.net"  # Replace with your hostname
   - name: DATABRICKS_HTTP_PATH
-    value: "/sql/1.0/warehouses/<your-warehouse-id>"  # Replace with your warehouse path
+    value: "/sql/1.0/warehouses/148ccb90800933a1"  # Replace with your warehouse path
   - name: DATABRICKS_TOKEN
     value: ""  # Set via Databricks App secrets, NOT here (security risk)
