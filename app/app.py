@@ -581,45 +581,64 @@ def render_reserve_projection():
     st.markdown("---")
     st.markdown('<div class="section-header">📤 Submission</div>', unsafe_allow_html=True)
     
-    h1, h2, h3, h4, h5 = st.columns([1, 1, 1, 1, 2])
+    h1, h2, h3, h4, h5, h6, h7 = st.columns([1, 1, 1, 1, 1, 1, 2])
     with h1:
         st.markdown("**Origin Year**")
     with h2:
         st.markdown("**Ultimate**")
     with h3:
-        st.markdown("**Additional**")
+        st.markdown("**IBNR**")
     with h4:
-        st.markdown("**Total**")
+        st.markdown("**Additional**")
     with h5:
+        st.markdown("**Total Ultimate**")
+    with h6:
+        st.markdown("**Total IBNR**")
+    with h7:
         st.markdown("**Comments**")
     
     st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
     
     sub_data = []
-    # Use Ultimate Reserve from Reserve Estimates section (calculated with current credibility)
+    # Use Ultimate Reserve and IBNR from Reserve Estimates section (calculated with current credibility)
     for data in reserve_data:
         oy = data['origin_year']
         # Recalculate ultimate reserve with current credibility values
         current_cred = st.session_state.credibility.get(oy, data['credibility'])
         ultimate_reserve = current_cred * data['chain_ladder_ultimate'] + (1 - current_cred) * data['bf_ultimate']
+        # Calculate IBNR for current ultimate reserve
+        ibnr_reserve = ultimate_reserve - data['paid_to_date'] - data['case_reserve']
         add = st.session_state.additional_reserves.get(oy, 0)
-        sub_data.append({'OY': oy, 'Ultimate': ultimate_reserve, 'Additional': add, 'Total': ultimate_reserve + add})
+        total_ultimate = ultimate_reserve + add
+        total_ibnr = ibnr_reserve + add
+        sub_data.append({
+            'OY': oy, 
+            'Ultimate': ultimate_reserve, 
+            'IBNR': ibnr_reserve,
+            'Additional': add, 
+            'Total Ultimate': total_ultimate,
+            'Total IBNR': total_ibnr
+        })
     
     for s in sub_data:
-        c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 2])
+        c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 2])
         with c1:
             st.markdown(f"**{s['OY']}**")
         with c2:
             st.markdown(f"${s['Ultimate']:,.0f}")
         with c3:
-            st.markdown(f"${s['Additional']:,.0f}")
+            st.markdown(f"${s['IBNR']:,.0f}")
         with c4:
-            st.markdown(f"**${s['Total']:,.0f}**")
+            st.markdown(f"${s['Additional']:,.0f}")
         with c5:
+            st.markdown(f"**${s['Total Ultimate']:,.0f}**")
+        with c6:
+            st.markdown(f"**${s['Total IBNR']:,.0f}**")
+        with c7:
             st.session_state.user_comments[s['OY']] = st.text_input("", value=st.session_state.user_comments.get(s['OY'], ''), key=f"c_{s['OY']}", label_visibility="collapsed")
     
     if st.button("📤 Submit", key="sub"):
-        total_reserve = sum(s['Total'] for s in sub_data)
+        total_reserve = sum(s['Total Ultimate'] for s in sub_data)
         st.session_state.submissions.append({'Datetime': datetime.now().strftime('%m/%d/%Y %H:%M'), 'Loss Type': selected_loss_type, 'Total Reserve': f"${total_reserve:,.0f}"})
         st.success(f"✅ Submitted!")
     
