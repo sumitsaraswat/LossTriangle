@@ -571,19 +571,71 @@ def render_reserve_projection():
                 st.markdown(f"${new_ibnr:,.0f}")
     
     with col_chart:
-        # Update chart with new ultimate reserves based on current credibility
+        # Plot Ultimate (ChainLadder) and Ultimate (BF) as lines, plus Paid and IBNR as bars
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=reserve_df['origin_year'], y=reserve_df['paid_to_date'], name='Paid', marker_color='rgba(45,90,135,0.7)'))
-        # Recalculate IBNR using current credibility values from session_state
-        updated_ibnr = []
+        
+        # Extract data for plotting
+        origin_years = [data['origin_year'] for data in reserve_data]
+        chain_ladder_values = [data['chain_ladder_ultimate'] for data in reserve_data]
+        bf_values = [data['bf_ultimate'] for data in reserve_data]
+        paid_values = [data['paid_to_date'] for data in reserve_data]
+        
+        # Calculate IBNR using current credibility values
+        ibnr_values = []
         for data in reserve_data:
             oy = data['origin_year']
             current_cred = st.session_state.credibility.get(oy, data['credibility'])
             current_ultimate = current_cred * data['chain_ladder_ultimate'] + (1 - current_cred) * data['bf_ultimate']
             current_ibnr = current_ultimate - data['paid_to_date'] - data['case_reserve']
-            updated_ibnr.append(current_ibnr)
-        fig.add_trace(go.Bar(x=reserve_df['origin_year'], y=updated_ibnr, name='IBNR', marker_color='rgba(220,38,38,0.7)'))
-        fig.update_layout(title="Paid vs IBNR", barmode='stack', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis_tickformat='$,.0f', height=350)
+            ibnr_values.append(current_ibnr)
+        
+        # Add Paid bars
+        fig.add_trace(go.Bar(
+            x=origin_years,
+            y=paid_values,
+            name='Paid',
+            marker_color='rgba(45,90,135,0.7)'
+        ))
+        
+        # Add IBNR bars
+        fig.add_trace(go.Bar(
+            x=origin_years,
+            y=ibnr_values,
+            name='IBNR',
+            marker_color='rgba(220,38,38,0.7)'
+        ))
+        
+        # Add ChainLadder line
+        fig.add_trace(go.Scatter(
+            x=origin_years,
+            y=chain_ladder_values,
+            mode='lines+markers',
+            name='Ultimate (ChainLadder)',
+            line=dict(color='#065f46', width=3),
+            marker=dict(size=8)
+        ))
+        
+        # Add BF line
+        fig.add_trace(go.Scatter(
+            x=origin_years,
+            y=bf_values,
+            mode='lines+markers',
+            name='Ultimate (BF)',
+            line=dict(color='#9333ea', width=3),
+            marker=dict(size=8)
+        ))
+        
+        fig.update_layout(
+            title="Ultimate Reserve and IBNR",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            yaxis_tickformat='$,.0f',
+            height=350,
+            xaxis_title="Origin Year",
+            yaxis_title="Amount ($)",
+            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            barmode='stack'  # Stack bars for Paid and IBNR
+        )
         st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
