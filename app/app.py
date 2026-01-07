@@ -630,10 +630,11 @@ def render_reserve_projection():
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             yaxis_tickformat='$,.0f',
-            height=350,
+            height=400,  # Increased height for better visibility
             xaxis_title="Origin Year",
             yaxis_title="Amount ($)",
-            legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01),
+            legend=dict(yanchor="top", y=1.02, xanchor="center", x=0.5, orientation="h"),
+            margin=dict(b=60, t=80, l=60, r=20),  # Top margin for legend, bottom margin for x-axis label
             barmode='stack'  # Stack bars for Paid and IBNR
         )
         st.plotly_chart(fig, use_container_width=True)
