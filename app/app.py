@@ -284,6 +284,8 @@ if 'user_comments' not in st.session_state:
     st.session_state.user_comments = {}
 if 'additional_reserves' not in st.session_state:
     st.session_state.additional_reserves = {}
+if 'credibility' not in st.session_state:
+    st.session_state.credibility = {}
 
 
 def create_triangle_heatmap(triangle_df, title="Loss Triangle"):
@@ -369,7 +371,7 @@ def render_reserve_projection():
     
     col1, col2 = st.columns([1, 1])
     with col1:
-        selected_loss_type = st.selectbox("Loss Type", ['ALL'] + loss_types, key="loss_type_select")
+        selected_loss_type = st.selectbox("Loss Type", loss_types, key="loss_type_select")
     with col2:
         st.markdown(f"**Selected:** {selected_loss_type}")
     
@@ -390,28 +392,204 @@ def render_reserve_projection():
     
     dev_factors = load_development_factors(selected_loss_type)
     
+    # Show Development Factors first
+    if dev_factors is not None and not dev_factors.empty:
+        st.markdown("##### Development Factors (SDP)")
+        st.dataframe(dev_factors.head(10), use_container_width=True, hide_index=True)
+        st.markdown("---")
+    
+    # Initialize credibility values for each origin year
+    for _, row in reserve_df.iterrows():
+        oy = row['origin_year']
+        if oy not in st.session_state.credibility:
+            st.session_state.credibility[oy] = 0.5
+    
+    # Calculate Bornhuetter-Ferguson Ultimate
+    # BF converges to ChainLadder in early years (high % developed)
+    # BF differs from ChainLadder in recent years (low % developed)
+    def calculate_bf_ultimate(chain_ladder, percent_developed, paid_to_date):
+        """Calculate Bornhuetter-Ferguson Ultimate that converges to ChainLadder in early years"""
+        # For early years (high % developed), BF should converge to ChainLadder
+        # For recent years (low % developed), BF starts lower/higher than ChainLadder
+        # Use a deviation factor that decreases as % developed increases
+        deviation_factor = -0.12  # 12% lower for very recent years (conservative)
+        convergence_factor = percent_developed / 100.0  # 0 to 1
+        
+        # BF starts lower than ChainLadder for recent years and converges to ChainLadder for early years
+        # For recent years (low % developed): BF = ChainLadder * (1 + deviation_factor)
+        # For early years (high % developed): BF = ChainLadder
+        adjustment = deviation_factor * (1 - convergence_factor)
+        bf_ultimate = chain_ladder * (1 + adjustment)
+        
+        # Ensure BF doesn't go below paid amount
+        bf_ultimate = max(bf_ultimate, paid_to_date * 1.1)
+        
+        return bf_ultimate
+    
+    # Prepare data for Reserve Estimates table
+    st.markdown("**Reserve Estimates by Origin Year**")
+    
+    # Create input columns for credibility
+    reserve_data = []
+    for idx, row in reserve_df.iterrows():
+        oy = row['origin_year']
+        paid = row['paid_to_date']
+        chain_ladder_ultimate = row['projected_ultimate']
+        ibnr = row['estimated_ibnr']
+        percent_dev = row.get('percent_developed', 100)
+        
+        # Case Reserve set to flat value
+        case_reserve = 99
+        
+        # Calculate Bornhuetter-Ferguson Ultimate
+        bf_ultimate = calculate_bf_ultimate(chain_ladder_ultimate, percent_dev, paid)
+        
+        # Get credibility (default 0.5 if not set)
+        credibility_val = st.session_state.credibility.get(oy, 0.5)
+        
+        # Calculate Ultimate Reserve: credibility*chain_ladder + (1-credibility)*bf
+        ultimate_reserve = credibility_val * chain_ladder_ultimate + (1 - credibility_val) * bf_ultimate
+        
+        # Calculate IBNR for ultimate reserve
+        ibnr_reserve = ultimate_reserve - paid - case_reserve
+        
+        reserve_data.append({
+            'origin_year': oy,
+            'paid_to_date': paid,
+            'case_reserve': case_reserve,
+            'chain_ladder_ultimate': chain_ladder_ultimate,
+            'bf_ultimate': bf_ultimate,
+            'credibility': credibility_val,
+            'ultimate_reserve': ultimate_reserve,
+            'ibnr': ibnr_reserve
+        })
+    
+    # Create table with editable credibility
     col_table, col_chart = st.columns([1.2, 1])
+    
     with col_table:
-        st.markdown("**Reserve Estimates by Origin Year**")
-        for _, row in reserve_df.iterrows():
-            oy = row['origin_year']
-            if oy not in st.session_state.chain_ladder_weights:
-                st.session_state.chain_ladder_weights[oy] = 0.5
+        # Add header row first
+        h1, h2, h3, h4, h5, h6, h7, h8 = st.columns([1, 1.2, 1.2, 1.2, 1.2, 1, 1.2, 1.2])
+        with h1:
+            st.markdown("**Origin Year**")
+        with h2:
+            st.markdown("**Paid To Date**")
+        with h3:
+            st.markdown("**Case Reserve**")
+        with h4:
+            st.markdown("**Ultimate (ChainLadder)**")
+        with h5:
+            st.markdown("**Ultimate (BF)**")
+        with h6:
+            st.markdown("**Credibility**")
+        with h7:
+            st.markdown("**Ultimate Reserve**")
+        with h8:
+            st.markdown("**IBNR**")
         
-        display_data = []
-        for _, row in reserve_df.iterrows():
-            display_data.append({'Origin Year': row['origin_year'], 'Paid': f"${row['paid_to_date']:,.0f}", 'Ultimate': f"${row['projected_ultimate']:,.0f}", 'IBNR': f"${row['estimated_ibnr']:,.0f}", '% Dev': f"{row.get('percent_developed', 100):.1f}%"})
-        st.dataframe(pd.DataFrame(display_data), use_container_width=True, hide_index=True)
+        st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
         
-        if dev_factors is not None and not dev_factors.empty:
-            st.markdown("##### Development Factors (SDP)")
-            st.dataframe(dev_factors.head(10), use_container_width=True, hide_index=True)
+        # Create a form-like interface for credibility inputs
+        for data in reserve_data:
+            oy = data['origin_year']
+            col1, col2, col3, col4, col5, col6, col7, col8 = st.columns([1, 1.2, 1.2, 1.2, 1.2, 1, 1.2, 1.2])
+            with col1:
+                st.markdown(f"**{oy}**")
+            with col2:
+                st.markdown(f"${data['paid_to_date']:,.0f}")
+            with col3:
+                st.markdown(f"${data['case_reserve']:,.0f}")
+            with col4:
+                st.markdown(f"${data['chain_ladder_ultimate']:,.0f}")
+            with col5:
+                st.markdown(f"${data['bf_ultimate']:,.0f}")
+            with col6:
+                credibility_input = st.number_input(
+                    "",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=float(data['credibility']),
+                    step=0.1,
+                    key=f"cred_{oy}",
+                    label_visibility="collapsed"
+                )
+                # Update session state immediately
+                st.session_state.credibility[oy] = credibility_input
+            with col7:
+                # Recalculate ultimate reserve with current credibility input
+                new_ultimate_reserve = credibility_input * data['chain_ladder_ultimate'] + (1 - credibility_input) * data['bf_ultimate']
+                st.markdown(f"**${new_ultimate_reserve:,.0f}**")
+            with col8:
+                new_ibnr = new_ultimate_reserve - data['paid_to_date'] - data['case_reserve']
+                st.markdown(f"${new_ibnr:,.0f}")
     
     with col_chart:
+        # Plot Ultimate (ChainLadder) and Ultimate (BF) as lines, plus Paid and IBNR as bars
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=reserve_df['origin_year'], y=reserve_df['paid_to_date'], name='Paid', marker_color='rgba(45,90,135,0.7)'))
-        fig.add_trace(go.Bar(x=reserve_df['origin_year'], y=reserve_df['estimated_ibnr'], name='IBNR', marker_color='rgba(220,38,38,0.7)'))
-        fig.update_layout(title="Paid vs IBNR", barmode='stack', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', yaxis_tickformat='$,.0f', height=350)
+        
+        # Extract data for plotting
+        origin_years = [data['origin_year'] for data in reserve_data]
+        chain_ladder_values = [data['chain_ladder_ultimate'] for data in reserve_data]
+        bf_values = [data['bf_ultimate'] for data in reserve_data]
+        paid_values = [data['paid_to_date'] for data in reserve_data]
+        
+        # Calculate IBNR using current credibility values
+        ibnr_values = []
+        for data in reserve_data:
+            oy = data['origin_year']
+            current_cred = st.session_state.credibility.get(oy, data['credibility'])
+            current_ultimate = current_cred * data['chain_ladder_ultimate'] + (1 - current_cred) * data['bf_ultimate']
+            current_ibnr = current_ultimate - data['paid_to_date'] - data['case_reserve']
+            ibnr_values.append(current_ibnr)
+        
+        # Add Paid bars
+        fig.add_trace(go.Bar(
+            x=origin_years,
+            y=paid_values,
+            name='Paid',
+            marker_color='rgba(45,90,135,0.7)'
+        ))
+        
+        # Add IBNR bars
+        fig.add_trace(go.Bar(
+            x=origin_years,
+            y=ibnr_values,
+            name='IBNR',
+            marker_color='rgba(220,38,38,0.7)'
+        ))
+        
+        # Add ChainLadder line
+        fig.add_trace(go.Scatter(
+            x=origin_years,
+            y=chain_ladder_values,
+            mode='lines+markers',
+            name='Ultimate (ChainLadder)',
+            line=dict(color='#065f46', width=3),
+            marker=dict(size=8)
+        ))
+        
+        # Add BF line
+        fig.add_trace(go.Scatter(
+            x=origin_years,
+            y=bf_values,
+            mode='lines+markers',
+            name='Ultimate (BF)',
+            line=dict(color='#9333ea', width=3),
+            marker=dict(size=8)
+        ))
+        
+        fig.update_layout(
+            title="Ultimate Reserve and IBNR",
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            yaxis_tickformat='$,.0f',
+            height=400,  # Increased height for better visibility
+            xaxis_title="Origin Year",
+            yaxis_title="Amount ($)",
+            legend=dict(yanchor="top", y=1.02, xanchor="center", x=0.5, orientation="h"),
+            margin=dict(b=60, t=80, l=60, r=20),  # Top margin for legend, bottom margin for x-axis label
+            barmode='stack'  # Stack bars for Paid and IBNR
+        )
         st.plotly_chart(fig, use_container_width=True)
     
     st.markdown("---")
@@ -456,42 +634,64 @@ def render_reserve_projection():
     st.markdown("---")
     st.markdown('<div class="section-header">📤 Submission</div>', unsafe_allow_html=True)
     
-    h1, h2, h3, h4, h5 = st.columns([1, 1, 1, 1, 2])
+    h1, h2, h3, h4, h5, h6, h7 = st.columns([1, 1, 1, 1, 1, 1, 2])
     with h1:
         st.markdown("**Origin Year**")
     with h2:
         st.markdown("**Ultimate**")
     with h3:
-        st.markdown("**Additional**")
+        st.markdown("**IBNR**")
     with h4:
-        st.markdown("**Total**")
+        st.markdown("**Additional**")
     with h5:
+        st.markdown("**Total Ultimate**")
+    with h6:
+        st.markdown("**Total IBNR**")
+    with h7:
         st.markdown("**Comments**")
     
     st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
     
     sub_data = []
-    for _, row in reserve_df.iterrows():
-        oy = row['origin_year']
-        ultimate = row['projected_ultimate']
+    # Use Ultimate Reserve and IBNR from Reserve Estimates section (calculated with current credibility)
+    for data in reserve_data:
+        oy = data['origin_year']
+        # Recalculate ultimate reserve with current credibility values
+        current_cred = st.session_state.credibility.get(oy, data['credibility'])
+        ultimate_reserve = current_cred * data['chain_ladder_ultimate'] + (1 - current_cred) * data['bf_ultimate']
+        # Calculate IBNR for current ultimate reserve
+        ibnr_reserve = ultimate_reserve - data['paid_to_date'] - data['case_reserve']
         add = st.session_state.additional_reserves.get(oy, 0)
-        sub_data.append({'OY': oy, 'Ultimate': ultimate, 'Additional': add, 'Total': ultimate + add})
+        total_ultimate = ultimate_reserve + add
+        total_ibnr = ibnr_reserve + add
+        sub_data.append({
+            'OY': oy, 
+            'Ultimate': ultimate_reserve, 
+            'IBNR': ibnr_reserve,
+            'Additional': add, 
+            'Total Ultimate': total_ultimate,
+            'Total IBNR': total_ibnr
+        })
     
     for s in sub_data:
-        c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 2])
+        c1, c2, c3, c4, c5, c6, c7 = st.columns([1, 1, 1, 1, 1, 1, 2])
         with c1:
             st.markdown(f"**{s['OY']}**")
         with c2:
             st.markdown(f"${s['Ultimate']:,.0f}")
         with c3:
-            st.markdown(f"${s['Additional']:,.0f}")
+            st.markdown(f"${s['IBNR']:,.0f}")
         with c4:
-            st.markdown(f"**${s['Total']:,.0f}**")
+            st.markdown(f"${s['Additional']:,.0f}")
         with c5:
+            st.markdown(f"**${s['Total Ultimate']:,.0f}**")
+        with c6:
+            st.markdown(f"**${s['Total IBNR']:,.0f}**")
+        with c7:
             st.session_state.user_comments[s['OY']] = st.text_input("", value=st.session_state.user_comments.get(s['OY'], ''), key=f"c_{s['OY']}", label_visibility="collapsed")
     
     if st.button("📤 Submit", key="sub"):
-        total_reserve = sum(s['Total'] for s in sub_data)
+        total_reserve = sum(s['Total Ultimate'] for s in sub_data)
         st.session_state.submissions.append({'Datetime': datetime.now().strftime('%m/%d/%Y %H:%M'), 'Loss Type': selected_loss_type, 'Total Reserve': f"${total_reserve:,.0f}"})
         st.success(f"✅ Submitted!")
     
