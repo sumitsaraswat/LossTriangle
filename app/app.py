@@ -596,11 +596,14 @@ def render_reserve_projection():
     st.markdown("<hr style='margin: 0.5rem 0;'>", unsafe_allow_html=True)
     
     sub_data = []
-    for _, row in reserve_df.iterrows():
-        oy = row['origin_year']
-        ultimate = row['projected_ultimate']
+    # Use Ultimate Reserve from Reserve Estimates section (calculated with current credibility)
+    for data in reserve_data:
+        oy = data['origin_year']
+        # Recalculate ultimate reserve with current credibility values
+        current_cred = st.session_state.credibility.get(oy, data['credibility'])
+        ultimate_reserve = current_cred * data['chain_ladder_ultimate'] + (1 - current_cred) * data['bf_ultimate']
         add = st.session_state.additional_reserves.get(oy, 0)
-        sub_data.append({'OY': oy, 'Ultimate': ultimate, 'Additional': add, 'Total': ultimate + add})
+        sub_data.append({'OY': oy, 'Ultimate': ultimate_reserve, 'Additional': add, 'Total': ultimate_reserve + add})
     
     for s in sub_data:
         c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 2])
